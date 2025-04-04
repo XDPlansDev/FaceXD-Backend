@@ -1,13 +1,15 @@
-// routes/posts.js - CRUD de postagens
-
 const express = require("express");
 const Post = require("../models/Post");
-const authMiddleware = require("../middleware/authMiddleware"); // Middleware de autenticação
+const { authenticateToken } = require("../middleware/authMiddleware"); // Middleware de autenticação corrigido
 const postsRouter = express.Router();
 
 // Criar um novo post (com autenticação)
-postsRouter.post("/", authMiddleware, async (req, res) => {
+postsRouter.post("/", authenticateToken, async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Usuário não autenticado." });
+    }
+
     const newPost = new Post({
       userId: req.user.id, // Agora req.user estará preenchido
       content: req.body.content,
@@ -15,6 +17,7 @@ postsRouter.post("/", authMiddleware, async (req, res) => {
     const savedPost = await newPost.save();
     res.status(201).json(savedPost);
   } catch (err) {
+    console.error("Erro ao criar post:", err);
     res.status(500).json({ message: "Erro ao criar post." });
   }
 });
@@ -41,7 +44,7 @@ postsRouter.get("/:id", async (req, res) => {
 });
 
 // Deletar post
-postsRouter.delete("/:id", async (req, res) => {
+postsRouter.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post não encontrado." });
