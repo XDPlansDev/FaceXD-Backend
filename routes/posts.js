@@ -2,7 +2,7 @@
 
 const express = require("express");
 const Post = require("../models/Post");
-const { authenticateToken } = require("../middleware/authMiddleware"); // CORRIGIDO!
+const { authenticateToken } = require("../middleware/authMiddleware"); // ⚡ Certifique-se que este caminho está correto!
 
 const postsRouter = express.Router();
 
@@ -10,18 +10,20 @@ const postsRouter = express.Router();
 postsRouter.post("/", authenticateToken, async (req, res) => {
   try {
     const { content } = req.body;
+
     if (!content) {
       return res.status(400).json({ error: "O conteúdo do post é obrigatório." });
     }
 
     const newPost = new Post({
-      userId: req.user.id,
+      userId: req.user?.id, // ⚠️ Confirme que `req.user` está sendo corretamente definido no `authenticateToken`
       content,
     });
 
     await newPost.save();
     res.status(201).json(newPost);
   } catch (err) {
+    console.error("Erro ao criar post:", err);
     res.status(500).json({ error: "Erro ao criar post." });
   }
 });
@@ -32,6 +34,7 @@ postsRouter.get("/user/:userId", async (req, res) => {
     const posts = await Post.find({ userId: req.params.userId }).sort({ createdAt: -1 });
     res.status(200).json(posts);
   } catch (err) {
+    console.error("Erro ao buscar posts:", err);
     res.status(500).json({ message: "Erro ao buscar posts do usuário." });
   }
 });
@@ -41,8 +44,10 @@ postsRouter.get("/:id", async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post não encontrado." });
+
     res.status(200).json(post);
   } catch (err) {
+    console.error("Erro ao buscar post:", err);
     res.status(500).json({ message: "Erro ao buscar post." });
   }
 });
@@ -53,7 +58,9 @@ postsRouter.post("/:id/like", authenticateToken, async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post não encontrado." });
 
-    const userId = req.user.id;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "Usuário não autenticado." });
+
     if (post.likes.includes(userId)) {
       return res.status(400).json({ message: "Você já curtiu este post." });
     }
@@ -62,6 +69,7 @@ postsRouter.post("/:id/like", authenticateToken, async (req, res) => {
     await post.save();
     res.status(200).json({ message: "Post curtido com sucesso." });
   } catch (err) {
+    console.error("Erro ao curtir post:", err);
     res.status(500).json({ message: "Erro ao curtir post." });
   }
 });
@@ -71,13 +79,15 @@ postsRouter.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post não encontrado." });
-    if (post.userId.toString() !== req.user.id) {
+
+    if (post.userId.toString() !== req.user?.id) {
       return res.status(403).json({ message: "Apenas o autor pode deletar este post." });
     }
 
     await post.deleteOne();
     res.status(200).json({ message: "Post deletado com sucesso." });
   } catch (err) {
+    console.error("Erro ao deletar post:", err);
     res.status(500).json({ message: "Erro ao deletar post." });
   }
 });

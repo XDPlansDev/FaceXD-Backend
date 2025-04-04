@@ -2,8 +2,23 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
+const { authenticateToken } = require("../middleware/authMiddleware"); // Correção aqui 👈
 
 const router = express.Router();
+
+// Obter dados do usuário logado
+router.get("/me", authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+    res.status(200).json(user);
+  } catch (err) {
+    console.error("Erro ao buscar perfil:", err);
+    res.status(500).json({ message: "Erro ao buscar perfil do usuário." });
+  }
+});
 
 // Registrar novo usuário
 router.post("/register", async (req, res) => {
