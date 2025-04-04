@@ -1,5 +1,3 @@
-// routes/auth.js - Rotas de autenticação (registro e login)
-
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
@@ -11,7 +9,11 @@ router.post("/register", async (req, res) => {
   try {
     const { nome, sobrenome, telefone, email, cep, password } = req.body;
 
-    // Verifica se já existe usuário com mesmo e-mail
+    if (!nome || !sobrenome || !email || !cep || !password) {
+      return res.status(400).json({ message: "Preencha todos os campos obrigatórios!" });
+    }
+
+    // Verifica se já existe usuário com o mesmo e-mail
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ message: "Email já cadastrado." });
 
@@ -19,18 +21,21 @@ router.post("/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Criar usuário (o username será automaticamente o email)
     const newUser = new User({
       nome,
       sobrenome,
       telefone,
       email,
+      username: email, // Define o email como username
       cep,
       password: hashedPassword,
     });
 
-    const savedUser = await newUser.save();
-    res.status(201).json(savedUser);
+    await newUser.save();
+    res.status(201).json({ message: "Usuário registrado com sucesso!" });
   } catch (err) {
+    console.error("Erro no registro:", err);
     res.status(500).json({ message: "Erro ao registrar usuário." });
   }
 });
@@ -47,13 +52,14 @@ router.post("/login", async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Senha incorreta." });
 
     const token = jwt.sign(
-      { id: user._id, username: user.username },
+      { id: user._id, username: user.email }, // Usa o email como username
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    res.status(200).json({ token, user: { id: user._id, username: user.username, email: user.email } });
+    res.status(200).json({ token, user: { id: user._id, username: user.email, email: user.email } });
   } catch (err) {
+    console.error("Erro no login:", err);
     res.status(500).json({ message: "Erro ao fazer login." });
   }
 });
