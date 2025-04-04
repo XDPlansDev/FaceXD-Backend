@@ -9,7 +9,7 @@ const router = express.Router();
 // Registrar novo usuário
 router.post("/register", async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { nome, sobrenome, telefone, email, cep, password } = req.body;
 
     // Verifica se já existe usuário com mesmo e-mail
     const existingUser = await User.findOne({ email });
@@ -20,8 +20,11 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = new User({
-      username,
+      nome,
+      sobrenome,
+      telefone,
       email,
+      cep,
       password: hashedPassword,
     });
 
