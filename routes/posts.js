@@ -2,13 +2,14 @@
 
 const express = require("express");
 const Post = require("../models/Post");
+const authMiddleware = require("../middleware/authMiddleware"); // Middleware de autenticação
 const postsRouter = express.Router();
 
-// Criar um novo post
-postsRouter.post("/", async (req, res) => {
+// Criar um novo post (com autenticação)
+postsRouter.post("/", authMiddleware, async (req, res) => {
   try {
     const newPost = new Post({
-      userId: req.user.id,
+      userId: req.user.id, // Agora req.user estará preenchido
       content: req.body.content,
     });
     const savedPost = await newPost.save();
