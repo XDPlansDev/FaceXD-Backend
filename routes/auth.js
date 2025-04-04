@@ -2,6 +2,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
+
 const router = express.Router();
 
 // Registrar novo usuário
@@ -13,21 +14,18 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Preencha todos os campos obrigatórios!" });
     }
 
-    // Verifica se já existe usuário com o mesmo e-mail
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ message: "Email já cadastrado." });
 
-    // Criptografa a senha
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Criar usuário (o username será automaticamente o email)
     const newUser = new User({
       nome,
       sobrenome,
       telefone,
       email,
-      username: email, // Define o email como username
+      username: email,
       cep,
       password: hashedPassword,
     });
@@ -52,12 +50,22 @@ router.post("/login", async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Senha incorreta." });
 
     const token = jwt.sign(
-      { id: user._id, username: user.email }, // Usa o email como username
+      { id: user._id, username: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    res.status(200).json({ token, user: { id: user._id, username: user.email, email: user.email } });
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        nome: user.nome,
+        sobrenome: user.sobrenome,
+        email: user.email,
+        cep: user.cep,
+        telefone: user.telefone,
+      },
+    });
   } catch (err) {
     console.error("Erro no login:", err);
     res.status(500).json({ message: "Erro ao fazer login." });

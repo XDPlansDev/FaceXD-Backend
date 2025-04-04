@@ -1,25 +1,28 @@
+// routes/posts.js
+
 const express = require("express");
 const Post = require("../models/Post");
-const { authenticateToken } = require("../middleware/authMiddleware"); // Middleware de autenticação corrigido
+const { authenticateToken } = require("../middleware/authMiddleware"); // CORRIGIDO!
+
 const postsRouter = express.Router();
 
-// Criar um novo post (com autenticação)
+// Criar um novo post (Usuário precisa estar autenticado)
 postsRouter.post("/", authenticateToken, async (req, res) => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Usuário não autenticado." });
+    const { content } = req.body;
+    if (!content) {
+      return res.status(400).json({ error: "O conteúdo do post é obrigatório." });
     }
 
     const newPost = new Post({
-      userId: req.user.id, // Agora req.user estará preenchido
-      content: req.body.content,
-      likes: [] // Lista de usuários que curtiram o post
+      userId: req.user.id,
+      content,
     });
-    const savedPost = await newPost.save();
-    res.status(201).json(savedPost);
+
+    await newPost.save();
+    res.status(201).json(newPost);
   } catch (err) {
-    console.error("Erro ao criar post:", err);
-    res.status(500).json({ message: "Erro ao criar post." });
+    res.status(500).json({ error: "Erro ao criar post." });
   }
 });
 
@@ -44,7 +47,7 @@ postsRouter.get("/:id", async (req, res) => {
   }
 });
 
-// Curtir post
+// Curtir post (somente uma vez por usuário)
 postsRouter.post("/:id/like", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -63,12 +66,14 @@ postsRouter.post("/:id/like", authenticateToken, async (req, res) => {
   }
 });
 
-// Deletar post
+// Deletar post (apenas o autor pode deletar)
 postsRouter.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: "Post não encontrado." });
-    if (post.userId.toString() !== req.user.id) return res.status(403).json({ message: "Apenas o autor pode deletar este post." });
+    if (post.userId.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Apenas o autor pode deletar este post." });
+    }
 
     await post.deleteOne();
     res.status(200).json({ message: "Post deletado com sucesso." });

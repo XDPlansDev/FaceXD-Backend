@@ -18,7 +18,9 @@ router.get("/:id", async (req, res) => {
 // Seguir usuário
 router.put("/:id/follow", async (req, res) => {
   try {
-    if (req.user.id === req.params.id) return res.status(400).json({ message: "Você não pode se seguir." });
+    if (req.user.id === req.params.id) {
+      return res.status(400).json({ message: "Você não pode se seguir." });
+    }
 
     const userToFollow = await User.findById(req.params.id);
     const currentUser = await User.findById(req.user.id);
@@ -26,8 +28,10 @@ router.put("/:id/follow", async (req, res) => {
     if (!userToFollow.followers.includes(req.user.id)) {
       userToFollow.followers.push(req.user.id);
       currentUser.following.push(req.params.id);
+
       await userToFollow.save();
       await currentUser.save();
+
       res.status(200).json({ message: "Usuário seguido com sucesso." });
     } else {
       res.status(400).json({ message: "Você já segue este usuário." });
@@ -40,7 +44,9 @@ router.put("/:id/follow", async (req, res) => {
 // Deixar de seguir usuário
 router.put("/:id/unfollow", async (req, res) => {
   try {
-    if (req.user.id === req.params.id) return res.status(400).json({ message: "Você não pode deixar de se seguir." });
+    if (req.user.id === req.params.id) {
+      return res.status(400).json({ message: "Você não pode deixar de se seguir." });
+    }
 
     const userToUnfollow = await User.findById(req.params.id);
     const currentUser = await User.findById(req.user.id);
@@ -48,8 +54,10 @@ router.put("/:id/unfollow", async (req, res) => {
     if (userToUnfollow.followers.includes(req.user.id)) {
       userToUnfollow.followers.pull(req.user.id);
       currentUser.following.pull(req.params.id);
+
       await userToUnfollow.save();
       await currentUser.save();
+
       res.status(200).json({ message: "Você deixou de seguir este usuário." });
     } else {
       res.status(400).json({ message: "Você não segue este usuário." });
