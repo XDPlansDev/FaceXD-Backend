@@ -1,10 +1,9 @@
-// routes/users.js - Rotas relacionadas a usuários
-
 const express = require("express");
-const User = require("../models/User");
 const router = express.Router();
+const User = require("../models/User");
+const { authenticateToken } = require("../middleware/authMiddleware"); // ✅ Correto agora
 
-// Obter perfil do usuário por ID
+// 📄 Obter perfil público de um usuário
 router.get("/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
@@ -15,8 +14,8 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Seguir usuário
-router.put("/:id/follow", async (req, res) => {
+// ➕ Seguir usuário (requer autenticação)
+router.put("/:id/follow", authenticateToken, async (req, res) => {
   try {
     if (req.user.id === req.params.id) {
       return res.status(400).json({ message: "Você não pode se seguir." });
@@ -41,8 +40,8 @@ router.put("/:id/follow", async (req, res) => {
   }
 });
 
-// Deixar de seguir usuário
-router.put("/:id/unfollow", async (req, res) => {
+// ➖ Deixar de seguir usuário (requer autenticação)
+router.put("/:id/unfollow", authenticateToken, async (req, res) => {
   try {
     if (req.user.id === req.params.id) {
       return res.status(400).json({ message: "Você não pode deixar de se seguir." });

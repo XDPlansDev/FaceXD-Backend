@@ -9,34 +9,33 @@ const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const postRoutes = require("./routes/posts");
 const commentRoutes = require("./routes/comments");
-const { authenticateToken } = require("./middleware/authMiddleware");
 
 dotenv.config();
 const app = express();
 
-// Middlewares globais
+// 🌐 Middlewares globais
 app.use(cors());
 app.use(express.json());
 
-// Conexão MongoDB
+// 🔌 Conexão com MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
 .then(() => console.log("✅ MongoDB conectado!"))
-.catch(err => console.error("Erro ao conectar MongoDB:", err));
+.catch(err => console.error("❌ Erro ao conectar MongoDB:", err));
 
-// Rotas públicas
+// 🛣️ Rotas públicas
 app.use("/api/auth", authRoutes);
 
-// Rotas privadas com token
-app.use("/api/users", authenticateToken, userRoutes);
-app.use("/api/posts", authenticateToken, postRoutes);
-app.use("/api/comments", authenticateToken, commentRoutes);
+// 🔒 Rotas protegidas (com middleware nos próprios arquivos)
+app.use("/api/users", userRoutes);
+app.use("/api/posts", postRoutes);
+app.use("/api/comments", commentRoutes);
 
-// Rota default
+// 🌍 Rota padrão
 app.get("/", (req, res) => res.send("🚀 API da rede social rodando..."));
 
-// Iniciar servidor
+// 🚀 Iniciar servidor
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
