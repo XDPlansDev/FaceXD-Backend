@@ -52,13 +52,7 @@ const UserSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true } // Cria campos createdAt e updatedAt automaticamente
+  { timestamps: true }
 );
-
-// Antes de salvar, definir username como o email
-UserSchema.pre("save", function (next) {
-  this.username = this.email;
-  next();
-});
 
 module.exports = mongoose.model("User", UserSchema);
