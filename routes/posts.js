@@ -14,7 +14,7 @@ const postsRouter = express.Router();
 postsRouter.post("/", authenticateToken, async (req, res) => {
   try {
     const { content } = req.body;
-    if (!content) {
+    if (!content?.trim()) {
       return res.status(400).json({ error: "O conteúdo do post é obrigatório." });
     }
 
@@ -25,8 +25,9 @@ postsRouter.post("/", authenticateToken, async (req, res) => {
 
     await newPost.save();
 
-    const postComUsuario = await Post.findById(newPost._id).populate("userId", "nome avatar");
-    res.status(201).json(postComUsuario);
+    const post = await Post.findById(newPost._id).populate("userId", "nome avatar");
+
+    res.status(201).json(post);
   } catch (err) {
     console.error("Erro ao criar post:", err);
     res.status(500).json({ error: "Erro ao criar post." });
@@ -52,7 +53,7 @@ postsRouter.get("/feed", authenticateToken, async (req, res) => {
 
 /**
  * @route   GET /api/posts/user/:userId
- * @desc    Posts por ID do usuário
+ * @desc    Retorna posts por ID de usuário
  */
 postsRouter.get("/user/:userId", async (req, res) => {
   try {
@@ -62,14 +63,14 @@ postsRouter.get("/user/:userId", async (req, res) => {
 
     res.status(200).json(posts);
   } catch (err) {
-    console.error("Erro ao buscar posts:", err);
+    console.error("Erro ao buscar posts do usuário:", err);
     res.status(500).json({ message: "Erro ao buscar posts do usuário." });
   }
 });
 
 /**
  * @route   GET /api/posts/username/:username
- * @desc    Posts por username
+ * @desc    Retorna posts por username
  */
 postsRouter.get("/username/:username", async (req, res) => {
   try {
@@ -91,12 +92,15 @@ postsRouter.get("/username/:username", async (req, res) => {
 
 /**
  * @route   GET /api/posts/:id
- * @desc    Post por ID
+ * @desc    Retorna post por ID
  */
 postsRouter.get("/:id", async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).populate("userId", "nome avatar");
-    if (!post) return res.status(404).json({ message: "Post não encontrado." });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post não encontrado." });
+    }
 
     res.status(200).json(post);
   } catch (err) {
@@ -112,17 +116,16 @@ postsRouter.get("/:id", async (req, res) => {
 postsRouter.put("/:id/like", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
+
     if (!post) {
       return res.status(404).json({ message: "Post não encontrado." });
     }
 
-    // Garante que post.likes seja sempre um array válido
     post.likes = Array.isArray(post.likes) ? post.likes : [];
 
     const userId = req.user.id;
     const hasLiked = post.likes.includes(userId);
 
-    // Toggle da curtida
     if (hasLiked) {
       post.likes = post.likes.filter((id) => id.toString() !== userId);
     } else {
@@ -131,38 +134,38 @@ postsRouter.put("/:id/like", authenticateToken, async (req, res) => {
 
     await post.save();
 
-    // Recupera post atualizado com usuário populado
     const updatedPost = await Post.findById(post._id).populate("userId", "nome avatar");
 
-    // 🚨 LOG para debug: ver likes atualizados
-    console.log("✅ Curtida atualizada com sucesso:");
-    console.log(updatedPost);
-
-    // Retorna também o array `likes` para o frontend exibir corretamente
     res.status(200).json({
       ...updatedPost._doc,
       likes: post.likes,
+      totalLikes: post.likes.length,
+      likedByUser: !hasLiked,
     });
   } catch (err) {
-    console.error("❌ Erro ao curtir post:", err);
-    res.status(500).json({ message: "Erro ao curtir post.", error: err.message });
+    console.error("Erro ao curtir post:", err);
+    res.status(500).json({ message: "Erro ao curtir post." });
   }
 });
 
 /**
  * @route   DELETE /api/posts/:id
- * @desc    Deletar post (somente autor)
+ * @desc    Deleta post (somente autor)
  */
 postsRouter.delete("/:id", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (!post) return res.status(404).json({ message: "Post não encontrado." });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post não encontrado." });
+    }
 
     if (post.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Você não pode deletar este post." });
+      return res.status(403).json({ message: "Você não tem permissão para deletar este post." });
     }
 
     await post.deleteOne();
+
     res.status(200).json({ message: "Post deletado com sucesso." });
   } catch (err) {
     console.error("Erro ao deletar post:", err);
