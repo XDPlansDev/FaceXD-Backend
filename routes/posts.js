@@ -1,5 +1,3 @@
-// 📄 Caminho: /routes/posts.js
-
 const express = require("express");
 const Post = require("../models/Post");
 const User = require("../models/User");
@@ -29,24 +27,35 @@ postsRouter.post("/", authenticateToken, async (req, res) => {
 
     res.status(201).json(post);
   } catch (err) {
-    console.error("Erro ao criar post:", err);
+    console.error("❌ Erro ao criar post:", err);
     res.status(500).json({ error: "Erro ao criar post." });
   }
 });
 
 /**
  * @route   GET /api/posts/feed
- * @desc    Retorna posts do usuário logado
+ * @desc    Retorna posts do usuário logado + de quem ele segue
  */
 postsRouter.get("/feed", authenticateToken, async (req, res) => {
   try {
-    const posts = await Post.find({ userId: req.user.id })
+    // 🧠 Pega o usuário logado com a lista de quem ele segue
+    const currentUser = await User.findById(req.user.id);
+    const followingIds = currentUser.following || [];
+
+    console.log("👤 Usuário logado:", req.user.id);
+    console.log("📍 Seguindo:", followingIds);
+
+    // 🧲 Inclui o próprio ID para ver também os próprios posts
+    const userIdsToFetch = [req.user.id, ...followingIds];
+
+    // 🔍 Busca posts dessas pessoas
+    const posts = await Post.find({ userId: { $in: userIdsToFetch } })
       .sort({ createdAt: -1 })
       .populate("userId", "nome avatar");
 
     res.status(200).json(posts);
   } catch (err) {
-    console.error("Erro ao buscar feed:", err);
+    console.error("❌ Erro ao buscar feed:", err);
     res.status(500).json({ message: "Erro ao buscar feed do usuário." });
   }
 });
@@ -63,7 +72,7 @@ postsRouter.get("/user/:userId", async (req, res) => {
 
     res.status(200).json(posts);
   } catch (err) {
-    console.error("Erro ao buscar posts do usuário:", err);
+    console.error("❌ Erro ao buscar posts do usuário:", err);
     res.status(500).json({ message: "Erro ao buscar posts do usuário." });
   }
 });
@@ -85,7 +94,7 @@ postsRouter.get("/username/:username", async (req, res) => {
 
     res.status(200).json(posts);
   } catch (err) {
-    console.error("Erro ao buscar posts por username:", err);
+    console.error("❌ Erro ao buscar posts por username:", err);
     res.status(500).json({ message: "Erro ao buscar posts do usuário." });
   }
 });
@@ -104,7 +113,7 @@ postsRouter.get("/:id", async (req, res) => {
 
     res.status(200).json(post);
   } catch (err) {
-    console.error("Erro ao buscar post:", err);
+    console.error("❌ Erro ao buscar post:", err);
     res.status(500).json({ message: "Erro ao buscar post." });
   }
 });
@@ -143,7 +152,7 @@ postsRouter.put("/:id/like", authenticateToken, async (req, res) => {
       likedByUser: !hasLiked,
     });
   } catch (err) {
-    console.error("Erro ao curtir post:", err);
+    console.error("❌ Erro ao curtir post:", err);
     res.status(500).json({ message: "Erro ao curtir post." });
   }
 });
@@ -168,7 +177,7 @@ postsRouter.delete("/:id", authenticateToken, async (req, res) => {
 
     res.status(200).json({ message: "Post deletado com sucesso." });
   } catch (err) {
-    console.error("Erro ao deletar post:", err);
+    console.error("❌ Erro ao deletar post:", err);
     res.status(500).json({ message: "Erro ao deletar post." });
   }
 });
