@@ -4,13 +4,18 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const path = require("path");
 
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const postRoutes = require("./routes/posts");
 const commentRoutes = require("./routes/comments");
 
-dotenv.config();
+// 🔧 Carrega o .env certo com base no ambiente
+dotenv.config({
+  path: path.resolve(__dirname, `.env.${process.env.NODE_ENV || "development"}`),
+});
+
 const app = express();
 
 // 🌐 Middlewares globais
@@ -22,7 +27,7 @@ mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log("✅ MongoDB conectado!"))
+.then(() => console.log(`✅ MongoDB conectado! [${process.env.NODE_ENV}]`))
 .catch(err => console.error("❌ Erro ao conectar MongoDB:", err));
 
 // 🛣️ Rotas públicas

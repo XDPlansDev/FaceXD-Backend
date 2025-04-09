@@ -12,11 +12,6 @@ const UserSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    telefone: {
-      type: String,
-      required: false, // Opcional
-      trim: true,
-    },
     email: {
       type: String,
       required: true,
@@ -30,6 +25,15 @@ const UserSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+
+    // ✅ Data da última alteração de username (padrão: data de criação)
+    usernameChangedAt: {
+      type: Date,
+      default: function () {
+        return this.createdAt;
+      },
+    },
+
     cep: {
       type: String,
       required: true,
@@ -39,6 +43,21 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+
+    // ✅ Sexo do usuário
+    sexo: {
+      type: String,
+      enum: ["Masculino", "Feminino"],
+      required: true,
+    },
+
+    // ✅ Data de nascimento
+    dataNascimento: {
+      type: Date,
+      required: true,
+    },
+
+    // ✅ Sistema de seguidores
     followers: [
       {
         type: mongoose.Schema.Types.ObjectId,
