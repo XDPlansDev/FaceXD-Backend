@@ -302,4 +302,82 @@ router.put("/:id/unfavorite", authenticateToken, async (req, res) => {
   }
 });
 
+// Enviar solicitação de amizade
+router.post("/:id/friend-request", authenticateToken, async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    const currentUser = await User.findById(req.user.id);
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    // Verifica se já existe uma solicitação pendente
+    if (targetUser.friendRequests.includes(req.user.id)) {
+      return res.status(400).json({ message: "Solicitação de amizade já enviada" });
+    }
+
+    // Verifica se já são amigos
+    if (targetUser.friends.includes(req.user.id)) {
+      return res.status(400).json({ message: "Usuários já são amigos" });
+    }
+
+    // Adiciona a solicitação de amizade
+    targetUser.friendRequests.push(req.user.id);
+    await targetUser.save();
+
+    res.json({ message: "Solicitação de amizade enviada" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Aceitar solicitação de amizade
+router.put("/:id/accept-friend", authenticateToken, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    const requestingUser = await User.findById(req.params.id);
+
+    if (!currentUser || !requestingUser) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    // Verifica se existe uma solicitação pendente
+    if (!currentUser.friendRequests.includes(req.params.id)) {
+      return res.status(400).json({ message: "Solicitação de amizade não encontrada" });
+    }
+
+    // Remove a solicitação e adiciona aos amigos
+    currentUser.friendRequests = currentUser.friendRequests.filter(id => id.toString() !== req.params.id);
+    currentUser.friends.push(req.params.id);
+    requestingUser.friends.push(req.user.id);
+
+    await currentUser.save();
+    await requestingUser.save();
+
+    res.json({ message: "Solicitação de amizade aceita" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Rejeitar solicitação de amizade
+router.put("/:id/reject-friend", authenticateToken, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    // Remove a solicitação
+    currentUser.friendRequests = currentUser.friendRequests.filter(id => id.toString() !== req.params.id);
+    await currentUser.save();
+
+    res.json({ message: "Solicitação de amizade rejeitada" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
