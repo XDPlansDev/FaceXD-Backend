@@ -37,6 +37,7 @@ router.post("/register", async (req, res) => {
       sobrenome,
       telefone,
       email,
+      username: providedUsername,
       cep,
       password,
       sexo,
@@ -53,12 +54,22 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Email já cadastrado." });
     }
 
-    // 🔁 Geração de username único
-    let username = generateUsername(nome);
-    let usernameExists = await User.findOne({ username });
-    while (usernameExists) {
+    // Verifica se o username fornecido está disponível
+    let username = providedUsername;
+    if (!username) {
+      // Se não foi fornecido username, gera um aleatório
       username = generateUsername(nome);
-      usernameExists = await User.findOne({ username });
+      let usernameExists = await User.findOne({ username });
+      while (usernameExists) {
+        username = generateUsername(nome);
+        usernameExists = await User.findOne({ username });
+      }
+    } else {
+      // Verifica se o username fornecido já existe
+      const usernameExists = await User.findOne({ username });
+      if (usernameExists) {
+        return res.status(400).json({ message: "Username já está em uso." });
+      }
     }
 
     // 🔒 Criptografando a senha
@@ -80,7 +91,28 @@ router.post("/register", async (req, res) => {
 
     await newUser.save();
 
-    res.status(201).json({ message: "Usuário registrado com sucesso!", username });
+    // 🪪 Gera token válido por 7 dias
+    const token = jwt.sign(
+      { id: newUser._id, username: newUser.username },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      message: "Usuário registrado com sucesso!",
+      token,
+      user: {
+        id: newUser._id,
+        nome: newUser.nome,
+        sobrenome: newUser.sobrenome,
+        email: newUser.email,
+        username: newUser.username,
+        cep: newUser.cep,
+        telefone: newUser.telefone,
+        sexo: newUser.sexo,
+        dataNascimento: newUser.dataNascimento,
+      }
+    });
   } catch (err) {
     console.error("Erro no registro:", err);
     res.status(500).json({ message: "Erro ao registrar usuário." });
@@ -132,6 +164,33 @@ router.post("/login", async (req, res) => {
   } catch (err) {
     console.error("Erro no login:", err);
     res.status(500).json({ message: "Erro ao fazer login." });
+  }
+});
+
+// 📌 Rota pública: Verificar disponibilidade de username
+router.get("/check-username/:username", async (req, res) => {
+  try {
+    const username = req.params.username;
+    const existingUser = await User.findOne({ username });
+
+    if (existingUser) {
+      // Gera sugestões de username disponíveis
+      const suggestions = [
+        `${username}${Math.floor(Math.random() * 1000)}`,
+        `${username}_${Math.floor(Math.random() * 1000)}`,
+        `${username}${Math.floor(Math.random() * 100)}`
+      ];
+
+      return res.status(200).json({
+        available: false,
+        suggestions
+      });
+    }
+
+    res.status(200).json({ available: true });
+  } catch (err) {
+    console.error("Erro ao verificar username:", err);
+    res.status(500).json({ message: "Erro ao verificar disponibilidade do username." });
   }
 });
 

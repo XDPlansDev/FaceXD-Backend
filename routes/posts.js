@@ -1,6 +1,7 @@
 const express = require("express");
 const Post = require("../models/Post");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const { authenticateToken } = require("../middleware/authMiddleware");
 const upload = require("../middleware/uploadMiddleware");
 const cloudinary = require("../utils/cloudinary");
@@ -145,40 +146,113 @@ postsRouter.get("/:id", async (req, res) => {
 
 /**
  * @route   PUT /api/posts/:id/like
- * @desc    Curtir ou remover curtida (toggle)
+ * @desc    Curtir/Descurtir um post
+ * @access  Privado
  */
 postsRouter.put("/:id/like", authenticateToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
+    const userId = req.user.id;
 
     if (!post) {
       return res.status(404).json({ message: "Post não encontrado." });
     }
 
+    // Inicializa o array de likes se não existir
     post.likes = Array.isArray(post.likes) ? post.likes : [];
 
-    const userId = req.user.id;
+    // Verifica se o usuário já curtiu o post
     const hasLiked = post.likes.includes(userId);
 
     if (hasLiked) {
       post.likes = post.likes.filter((id) => id.toString() !== userId);
     } else {
       post.likes.push(userId);
+
+      // Criar notificação apenas quando o usuário curte (não quando descurte)
+      // E apenas se o autor do post não for o próprio usuário que curtiu
+      if (post.userId.toString() !== userId) {
+        const currentUser = await User.findById(userId);
+
+        const notification = new Notification({
+          recipient: post.userId,
+          sender: userId,
+          type: "post_like",
+          content: `${currentUser.nome} ${currentUser.sobrenome} curtiu sua publicação.`,
+          relatedId: post._id,
+          onModel: "Post"
+        });
+
+        await notification.save();
+        console.log(`🔔 Notificação de curtida criada para o post ${post._id}`);
+      }
     }
 
     await post.save();
 
-    const updatedPost = await Post.findById(post._id).populate("userId", "nome avatar");
-
     res.status(200).json({
-      ...updatedPost._doc,
       likes: post.likes,
       totalLikes: post.likes.length,
       likedByUser: !hasLiked,
     });
   } catch (err) {
-    console.error("❌ Erro ao curtir post:", err);
-    res.status(500).json({ message: "Erro ao curtir post." });
+    console.error("❌ Erro ao curtir/descurtir post:", err);
+    res.status(500).json({ message: "Erro ao curtir/descurtir post." });
+  }
+});
+
+/**
+ * @route   POST /api/posts/:id/comment
+ * @desc    Adicionar um comentário a um post
+ * @access  Privado
+ */
+postsRouter.post("/:id/comment", authenticateToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    const userId = req.user.id;
+    const { content } = req.body;
+
+    if (!post) {
+      return res.status(404).json({ message: "Post não encontrado." });
+    }
+
+    if (!content || content.trim() === "") {
+      return res.status(400).json({ message: "Conteúdo do comentário é obrigatório." });
+    }
+
+    const comment = {
+      userId,
+      content,
+      createdAt: new Date()
+    };
+
+    // Inicializa o array de comentários se não existir
+    post.comments = Array.isArray(post.comments) ? post.comments : [];
+    post.comments.push(comment);
+
+    await post.save();
+
+    // Criar notificação apenas se o autor do post não for o próprio usuário que comentou
+    if (post.userId.toString() !== userId) {
+      const currentUser = await User.findById(userId);
+
+      const notification = new Notification({
+        recipient: post.userId,
+        sender: userId,
+        type: "post_comment",
+        content: `${currentUser.nome} ${currentUser.sobrenome} comentou em sua publicação: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`,
+        relatedId: post._id,
+        onModel: "Post"
+      });
+
+      await notification.save();
+      console.log(`🔔 Notificação de comentário criada para o post ${post._id}`);
+    }
+
+    res.status(201).json(comment);
+  } catch (err) {
+    console.error("❌ Erro ao adicionar comentário:", err);
+    res.status(500).json({ message: "Erro ao adicionar comentário." });
   }
 });
 

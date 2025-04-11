@@ -10,6 +10,7 @@ const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const postRoutes = require("./routes/posts");
 const commentRoutes = require("./routes/comments");
+const notificationRoutes = require("./routes/notifications");
 
 // 🔧 Carrega o .env certo com base no ambiente
 dotenv.config({
@@ -27,8 +28,8 @@ mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log(`✅ MongoDB conectado! [${process.env.NODE_ENV}]`))
-.catch(err => console.error("❌ Erro ao conectar MongoDB:", err));
+  .then(() => console.log(`✅ MongoDB conectado! [${process.env.NODE_ENV}]`))
+  .catch(err => console.error("❌ Erro ao conectar MongoDB:", err));
 
 // 🛣️ Rotas públicas
 app.use("/api/auth", authRoutes);
@@ -37,6 +38,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/comments", commentRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // 🌍 Rota padrão
 app.get("/", (req, res) => res.send("🚀 API da rede social rodando..."));

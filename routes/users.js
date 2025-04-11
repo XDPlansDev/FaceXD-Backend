@@ -4,6 +4,7 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const { authenticateToken } = require("../middleware/authMiddleware");
 
 /**
@@ -143,6 +144,19 @@ router.put("/:id/follow", authenticateToken, async (req, res) => {
       await userToFollow.save();
       await currentUser.save();
 
+      // Criar notificação para o usuário seguido
+      const notification = new Notification({
+        recipient: userToFollow._id,
+        sender: currentUser._id,
+        type: "follow",
+        content: `${currentUser.nome} ${currentUser.sobrenome} começou a seguir você.`,
+        relatedId: currentUser._id,
+        onModel: "User"
+      });
+
+      await notification.save();
+      console.log(`🔔 Notificação de seguidor criada para ${userToFollow.username}`);
+
       console.log(`✅ ${currentUser.username} começou a seguir ${userToFollow.username}`);
       res.status(200).json({ message: "Usuário seguido com sucesso." });
     } else {
@@ -154,39 +168,6 @@ router.put("/:id/follow", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Erro ao seguir usuário." });
   }
 });
-
-/**
- * @route   PUT /api/users/:id/follow
- * @desc    Seguir um usuário
- * @access  Privado
- */
-
-router.put("/:id/follow", authenticateToken, async (req, res) => {
-  try {
-    const userToFollow = await User.findById(req.params.id);
-    const currentUser = await User.findById(req.user.id);
-
-    if (!userToFollow || !currentUser) {
-      return res.status(404).json({ message: "Usuário não encontrado." });
-    }
-
-    if (userToFollow.followers.includes(req.user.id)) {
-      return res.status(400).json({ message: "Você já segue este usuário." });
-    }
-
-    userToFollow.followers.push(req.user.id);
-    currentUser.following.push(req.params.id);
-
-    await userToFollow.save();
-    await currentUser.save();
-
-    res.status(200).json({ message: "Usuário seguido com sucesso." });
-  } catch (err) {
-    console.error("Erro ao seguir usuário:", err);
-    res.status(500).json({ message: "Erro ao seguir usuário." });
-  }
-});
-
 
 /**
  * @route   PUT /api/users/:id/unfollow
@@ -326,6 +307,19 @@ router.post("/:id/friend-request", authenticateToken, async (req, res) => {
     targetUser.friendRequests.push(req.user.id);
     await targetUser.save();
 
+    // Criar notificação para o usuário alvo
+    const notification = new Notification({
+      recipient: targetUser._id,
+      sender: currentUser._id,
+      type: "friend_request",
+      content: `${currentUser.nome} ${currentUser.sobrenome} enviou uma solicitação de amizade para você.`,
+      relatedId: currentUser._id,
+      onModel: "User"
+    });
+
+    await notification.save();
+    console.log(`🔔 Notificação de solicitação de amizade criada para ${targetUser.username}`);
+
     res.json({ message: "Solicitação de amizade enviada" });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -354,6 +348,19 @@ router.put("/:id/accept-friend", authenticateToken, async (req, res) => {
 
     await currentUser.save();
     await requestingUser.save();
+
+    // Criar notificação para o usuário que enviou a solicitação
+    const notification = new Notification({
+      recipient: requestingUser._id,
+      sender: currentUser._id,
+      type: "friend_accepted",
+      content: `${currentUser.nome} ${currentUser.sobrenome} aceitou sua solicitação de amizade.`,
+      relatedId: currentUser._id,
+      onModel: "User"
+    });
+
+    await notification.save();
+    console.log(`🔔 Notificação de amizade aceita criada para ${requestingUser.username}`);
 
     res.json({ message: "Solicitação de amizade aceita" });
   } catch (err) {
