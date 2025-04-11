@@ -2,6 +2,9 @@ const express = require("express");
 const Post = require("../models/Post");
 const User = require("../models/User");
 const { authenticateToken } = require("../middleware/authMiddleware");
+const upload = require("../middleware/uploadMiddleware");
+const cloudinary = require("../utils/cloudinary");
+const fs = require("fs");
 
 const postsRouter = express.Router();
 
@@ -9,16 +12,38 @@ const postsRouter = express.Router();
  * @route   POST /api/posts/
  * @desc    Criar novo post (autenticado)
  */
-postsRouter.post("/", authenticateToken, async (req, res) => {
+postsRouter.post("/", authenticateToken, upload.single("image"), async (req, res) => {
   try {
     const { content } = req.body;
-    if (!content?.trim()) {
-      return res.status(400).json({ error: "O conteúdo do post é obrigatório." });
+    if (!content?.trim() && !req.file) {
+      return res.status(400).json({ error: "O conteúdo do post ou uma imagem é obrigatório." });
+    }
+
+    let imageUrl = null;
+
+    // Se houver uma imagem, faz upload para o Cloudinary
+    if (req.file) {
+      try {
+        // Upload para o Cloudinary
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "facexd/posts",
+          resource_type: "auto",
+        });
+
+        imageUrl = result.secure_url;
+
+        // Remove o arquivo temporário
+        fs.unlinkSync(req.file.path);
+      } catch (uploadError) {
+        console.error("❌ Erro ao fazer upload da imagem:", uploadError);
+        return res.status(500).json({ error: "Erro ao fazer upload da imagem." });
+      }
     }
 
     const newPost = new Post({
       userId: req.user.id,
       content,
+      image: imageUrl,
     });
 
     await newPost.save();

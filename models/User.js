@@ -70,6 +70,14 @@ const UserSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+
+    // ✅ Sistema de favoritos
+    favoritos: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true }
 );

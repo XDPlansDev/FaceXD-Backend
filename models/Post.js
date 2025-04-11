@@ -18,6 +18,12 @@ const PostSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // URL da imagem do post (opcional)
+    image: {
+      type: String,
+      default: null,
+    },
+
     // Lista de curtidas (IDs dos usuários que curtiram)
     likes: [
       {
