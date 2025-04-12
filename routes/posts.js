@@ -6,6 +6,7 @@ const { authenticateToken } = require("../middleware/authMiddleware");
 const upload = require("../middleware/uploadMiddleware");
 const cloudinary = require("../utils/cloudinary");
 const fs = require("fs");
+const mongoose = require("mongoose");
 
 const postsRouter = express.Router();
 
@@ -77,7 +78,14 @@ postsRouter.get("/feed", authenticateToken, async (req, res) => {
     // 🔍 Busca posts dessas pessoas
     const posts = await Post.find({ userId: { $in: userIdsToFetch } })
       .sort({ createdAt: -1 })
-      .populate("userId", "nome avatar");
+      .populate("userId", "nome username avatar")
+      .populate({
+        path: "comments",
+        populate: {
+          path: "userId",
+          select: "nome username avatar"
+        }
+      });
 
     res.status(200).json(posts);
   } catch (err) {
@@ -126,16 +134,95 @@ postsRouter.get("/username/:username", async (req, res) => {
 });
 
 /**
+ * @route   GET /api/posts/:username/:id
+ * @desc    Retorna post específico de um usuário
+ */
+postsRouter.get("/:username/:id", async (req, res) => {
+  try {
+    const { username, id } = req.params;
+
+    // Primeiro, encontra o usuário pelo username
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ message: "Usuário não encontrado." });
+    }
+
+    // Validar se o ID é válido do MongoDB
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "ID do post inválido" });
+    }
+
+    console.log(`🔍 Buscando post ${id} do usuário ${username}`);
+
+    // Busca o post específico deste usuário
+    const post = await Post.findOne({
+      _id: id,
+      userId: user._id
+    })
+      .populate("userId", "nome username avatar")
+      .populate({
+        path: "comments",
+        options: { sort: { createdAt: -1 } },
+        populate: {
+          path: "userId",
+          select: "nome username avatar"
+        }
+      });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post não encontrado." });
+    }
+
+    console.log("📝 Post encontrado:", {
+      id: post._id,
+      username: post.userId.username,
+      commentsCount: post.comments?.length
+    });
+
+    res.status(200).json(post);
+  } catch (err) {
+    console.error("❌ Erro ao buscar post:", err);
+    res.status(500).json({ message: "Erro ao buscar post." });
+  }
+});
+
+/**
  * @route   GET /api/posts/:id
  * @desc    Retorna post por ID
  */
 postsRouter.get("/:id", async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate("userId", "nome avatar");
+    // Validar se o ID é válido do MongoDB
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "ID do post inválido" });
+    }
+
+    console.log("🔍 Buscando post com ID:", req.params.id);
+
+    const post = await Post.findById(req.params.id)
+      .populate("userId", "nome username avatar")
+      .populate({
+        path: "comments",
+        options: { sort: { createdAt: -1 } },
+        populate: {
+          path: "userId",
+          select: "nome username avatar"
+        }
+      });
+
+    console.log("📝 Post encontrado:", post ? "Sim" : "Não");
 
     if (!post) {
       return res.status(404).json({ message: "Post não encontrado." });
     }
+
+    // Log do post para debug
+    console.log("Post details:", {
+      id: post._id,
+      userId: post.userId?._id,
+      username: post.userId?.username,
+      commentsCount: post.comments?.length
+    });
 
     res.status(200).json(post);
   } catch (err) {
