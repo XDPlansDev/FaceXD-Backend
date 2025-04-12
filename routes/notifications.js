@@ -16,7 +16,7 @@ router.get("/", authenticateToken, async (req, res) => {
         console.log(`🔔 Obtendo notificações para o usuário: ${req.user.id}`);
 
         const notifications = await Notification.find({ recipient: req.user.id })
-            .populate("sender", "nome username avatar")
+            .populate("sender", "nome sobrenome username avatar")
             .sort({ createdAt: -1 })
             .limit(50);
 

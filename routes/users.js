@@ -86,24 +86,22 @@ router.get("/username/:username", async (req, res) => {
 
 /**
  * @route   GET /api/users/me
- * @desc    Obter perfil do usuário autenticado
+ * @desc    Obter perfil do usuário autenticado com amigos e solicitações
  * @access  Privado
  */
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     console.log(`👤 Obtendo dados do usuário autenticado: ID ${req.user.id}`);
 
-    let user = await User.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id)
+      .select("-password")
+      .populate("friends", "nome username avatar")
+      .populate("friendRequests", "nome username avatar");
 
     if (!user) {
       console.warn("⚠️ Usuário autenticado não encontrado.");
       return res.status(404).json({ message: "Usuário não encontrado." });
     }
-
-    // 🛡️ Previne erros no frontend garantindo campos opcionais
-    if (!user.usernameChangedAt) user.usernameChangedAt = user.createdAt;
-    if (!user.sexo) user.sexo = '';
-    if (!user.dataNascimento) user.dataNascimento = '';
 
     res.status(200).json(user);
   } catch (err) {
@@ -384,6 +382,81 @@ router.put("/:id/reject-friend", authenticateToken, async (req, res) => {
     res.json({ message: "Solicitação de amizade rejeitada" });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+/**
+ * @route   GET /api/users/sent-requests
+ * @desc    Buscar solicitações de amizade enviadas
+ * @access  Privado
+ */
+router.get("/sent-requests", authenticateToken, async (req, res) => {
+  try {
+    const users = await User.find({
+      friendRequests: req.user.id
+    }).select("nome username avatar");
+
+    res.status(200).json(users);
+  } catch (err) {
+    console.error("❌ Erro ao buscar solicitações enviadas:", err);
+    res.status(500).json({ message: "Erro ao buscar solicitações enviadas." });
+  }
+});
+
+/**
+ * @route   PUT /api/users/:id/cancel-friend-request
+ * @desc    Cancelar uma solicitação de amizade enviada
+ * @access  Privado
+ */
+router.put("/:id/cancel-friend-request", authenticateToken, async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    // Remove a solicitação
+    targetUser.friendRequests = targetUser.friendRequests.filter(
+      id => id.toString() !== req.user.id
+    );
+    await targetUser.save();
+
+    res.json({ message: "Solicitação de amizade cancelada" });
+  } catch (err) {
+    console.error("❌ Erro ao cancelar solicitação:", err);
+    res.status(500).json({ message: "Erro ao cancelar solicitação de amizade." });
+  }
+});
+
+/**
+ * @route   PUT /api/users/:id/remove-friend
+ * @desc    Remover um amigo
+ * @access  Privado
+ */
+router.put("/:id/remove-friend", authenticateToken, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    const friendUser = await User.findById(req.params.id);
+
+    if (!currentUser || !friendUser) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    // Remove o amigo da lista de cada um
+    currentUser.friends = currentUser.friends.filter(
+      id => id.toString() !== req.params.id
+    );
+    friendUser.friends = friendUser.friends.filter(
+      id => id.toString() !== req.user.id
+    );
+
+    await currentUser.save();
+    await friendUser.save();
+
+    res.json({ message: "Amigo removido com sucesso" });
+  } catch (err) {
+    console.error("❌ Erro ao remover amigo:", err);
+    res.status(500).json({ message: "Erro ao remover amigo." });
   }
 });
 
