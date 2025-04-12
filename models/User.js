@@ -47,7 +47,7 @@ const UserSchema = new mongoose.Schema(
     // ✅ Sexo do usuário
     sexo: {
       type: String,
-      enum: ["Masculino", "Feminino"],
+      enum: ["M", "F", "O"],
       required: true,
     },
 

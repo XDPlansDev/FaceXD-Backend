@@ -171,7 +171,19 @@ router.post("/login", async (req, res) => {
 router.get("/check-username/:username", async (req, res) => {
   try {
     const username = req.params.username;
+    console.log("Verificando disponibilidade do username:", username);
+
+    // Verificando se o username está vazio
+    if (!username || username.trim() === "") {
+      console.log("Username vazio");
+      return res.status(400).json({
+        available: false,
+        message: "Username não pode estar vazio"
+      });
+    }
+
     const existingUser = await User.findOne({ username });
+    console.log("Usuário existente:", existingUser ? "Sim" : "Não");
 
     if (existingUser) {
       // Gera sugestões de username disponíveis
@@ -181,16 +193,44 @@ router.get("/check-username/:username", async (req, res) => {
         `${username}${Math.floor(Math.random() * 100)}`
       ];
 
+      console.log("Username indisponível, sugestões:", suggestions);
       return res.status(200).json({
         available: false,
         suggestions
       });
     }
 
+    console.log("Username disponível");
     res.status(200).json({ available: true });
   } catch (err) {
     console.error("Erro ao verificar username:", err);
     res.status(500).json({ message: "Erro ao verificar disponibilidade do username." });
+  }
+});
+
+// 📌 Rota pública: Teste de conexão
+router.get("/test", (req, res) => {
+  console.log("Teste de conexão recebido");
+  res.status(200).json({ message: "Conexão com o backend estabelecida com sucesso!" });
+});
+
+// 📌 Rota pública: Teste de verificação de username
+router.get("/test-username/:username", async (req, res) => {
+  try {
+    const username = req.params.username;
+    console.log("Teste de verificação de username:", username);
+
+    const existingUser = await User.findOne({ username });
+    console.log("Usuário existente:", existingUser ? "Sim" : "Não");
+
+    res.status(200).json({
+      username,
+      exists: !!existingUser,
+      available: !existingUser
+    });
+  } catch (err) {
+    console.error("Erro ao testar username:", err);
+    res.status(500).json({ message: "Erro ao testar username." });
   }
 });
 

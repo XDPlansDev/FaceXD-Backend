@@ -23,6 +23,41 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 📝 Middleware para logar todas as requisições
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+
+  // Loga o corpo da requisição se for POST ou PUT
+  if (req.method === 'POST' || req.method === 'PUT') {
+    console.log(`[${new Date().toISOString()}] Corpo da requisição:`, req.body);
+  }
+
+  // Loga os parâmetros da URL se houver
+  if (Object.keys(req.params).length > 0) {
+    console.log(`[${new Date().toISOString()}] Parâmetros da URL:`, req.params);
+  }
+
+  // Intercepta a resposta para logar o status e o corpo
+  const originalSend = res.send;
+  res.send = function (body) {
+    console.log(`[${new Date().toISOString()}] Resposta: ${res.statusCode} ${req.method} ${req.url}`);
+
+    // Tenta logar o corpo da resposta se for JSON
+    try {
+      if (typeof body === 'string') {
+        const jsonBody = JSON.parse(body);
+        console.log(`[${new Date().toISOString()}] Corpo da resposta:`, jsonBody);
+      }
+    } catch (e) {
+      // Ignora erros de parsing
+    }
+
+    return originalSend.call(this, body);
+  };
+
+  next();
+});
+
 // 🔌 Conexão com MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,

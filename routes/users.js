@@ -24,13 +24,13 @@ router.get("/search", async (req, res) => {
   try {
     const users = await User.find({
       $or: [
-        { name: { $regex: query, $options: "i" } },
+        { nome: { $regex: query, $options: "i" } },
         { username: { $regex: query, $options: "i" } },
-        { email: { $regex: query, $options: "i" } }, // Adicionado suporte a email
+        { email: { $regex: query, $options: "i" } },
       ],
     })
       .limit(10)
-      .select("name username avatar");
+      .select("nome username avatar");
 
     console.log(`🔎 ${users.length} usuários encontrados.`);
     res.json(users);
@@ -41,24 +41,82 @@ router.get("/search", async (req, res) => {
 });
 
 /**
- * @route   GET /api/users/:id
- * @desc    Obter perfil público de um usuário pelo ID
- * @access  Público
+ * @route   GET /api/users/me
+ * @desc    Obter perfil do usuário autenticado com amigos e solicitações
+ * @access  Privado
  */
-router.get("/:id", async (req, res) => {
+router.get("/me", authenticateToken, async (req, res) => {
   try {
-    console.log(`🔍 Buscando usuário pelo ID: ${req.params.id}`);
-    const user = await User.findById(req.params.id).select("-password");
+    console.log(`👤 Obtendo dados do usuário autenticado: ID ${req.user.id}`);
+
+    const user = await User.findById(req.user.id)
+      .select("-password")
+      .populate("friends", "nome username avatar")
+      .populate("friendRequests", "nome username avatar")
+      .populate("following", "nome username avatar")
+      .populate("followers", "nome username avatar");
 
     if (!user) {
-      console.warn("⚠️ Usuário não encontrado por ID.");
+      console.warn("⚠️ Usuário autenticado não encontrado.");
       return res.status(404).json({ message: "Usuário não encontrado." });
     }
 
+    console.log(`✅ Dados do usuário recuperados com sucesso. Amigos: ${user.friends.length}`);
     res.status(200).json(user);
   } catch (err) {
-    console.error("❌ Erro ao buscar usuário por ID:", err);
+    console.error("❌ Erro ao buscar perfil do usuário logado:", err);
     res.status(500).json({ message: "Erro ao buscar usuário." });
+  }
+});
+
+/**
+ * @route   GET /api/users/sent-requests
+ * @desc    Buscar solicitações de amizade enviadas
+ * @access  Privado
+ */
+router.get("/sent-requests", authenticateToken, async (req, res) => {
+  try {
+    console.log(`👤 Buscando solicitações enviadas pelo usuário: ${req.user.id}`);
+
+    const users = await User.find({
+      friendRequests: req.user.id
+    }).select("nome username avatar");
+
+    console.log(`✅ Encontradas ${users.length} solicitações enviadas`);
+    res.status(200).json(users);
+  } catch (err) {
+    console.error("❌ Erro ao buscar solicitações enviadas:", err);
+    res.status(500).json({ message: "Erro ao buscar solicitações enviadas." });
+  }
+});
+
+/**
+ * @route   GET /api/users/friend-requests
+ * @desc    Buscar solicitações de amizade recebidas
+ * @access  Privado
+ */
+router.get("/friend-requests", authenticateToken, async (req, res) => {
+  try {
+    console.log(`👤 Buscando solicitações recebidas pelo usuário: ${req.user.id}`);
+
+    const currentUser = await User.findById(req.user.id)
+      .populate({
+        path: "friendRequests",
+        select: "nome username avatar",
+        model: "User"
+      });
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    console.log(`✅ Encontradas ${currentUser.friendRequests.length} solicitações recebidas:`,
+      currentUser.friendRequests.map(r => ({ id: r._id, username: r.username })));
+
+    res.status(200).json(currentUser.friendRequests || []);
+  } catch (err) {
+    console.error("❌ Erro ao buscar solicitações recebidas:", err);
+    res.status(500).json({ message: "Erro ao buscar solicitações recebidas." });
   }
 });
 
@@ -85,27 +143,23 @@ router.get("/username/:username", async (req, res) => {
 });
 
 /**
- * @route   GET /api/users/me
- * @desc    Obter perfil do usuário autenticado com amigos e solicitações
- * @access  Privado
+ * @route   GET /api/users/:id
+ * @desc    Obter perfil público de um usuário pelo ID
+ * @access  Público
  */
-router.get("/me", authenticateToken, async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    console.log(`👤 Obtendo dados do usuário autenticado: ID ${req.user.id}`);
-
-    const user = await User.findById(req.user.id)
-      .select("-password")
-      .populate("friends", "nome username avatar")
-      .populate("friendRequests", "nome username avatar");
+    console.log(`🔍 Buscando usuário pelo ID: ${req.params.id}`);
+    const user = await User.findById(req.params.id).select("-password");
 
     if (!user) {
-      console.warn("⚠️ Usuário autenticado não encontrado.");
+      console.warn("⚠️ Usuário não encontrado por ID.");
       return res.status(404).json({ message: "Usuário não encontrado." });
     }
 
     res.status(200).json(user);
   } catch (err) {
-    console.error("❌ Erro ao buscar perfil do usuário logado:", err);
+    console.error("❌ Erro ao buscar usuário por ID:", err);
     res.status(500).json({ message: "Erro ao buscar usuário." });
   }
 });
@@ -327,6 +381,8 @@ router.post("/:id/friend-request", authenticateToken, async (req, res) => {
 // Aceitar solicitação de amizade
 router.put("/:id/accept-friend", authenticateToken, async (req, res) => {
   try {
+    console.log(`👤 Aceitando solicitação de amizade de ${req.params.id}`);
+
     const currentUser = await User.findById(req.user.id);
     const requestingUser = await User.findById(req.params.id);
 
@@ -335,17 +391,25 @@ router.put("/:id/accept-friend", authenticateToken, async (req, res) => {
     }
 
     // Verifica se existe uma solicitação pendente
-    if (!currentUser.friendRequests.includes(req.params.id)) {
+    const hasRequest = currentUser.friendRequests.some(
+      request => request.toString() === req.params.id
+    );
+
+    if (!hasRequest) {
+      console.warn("⚠️ Solicitação de amizade não encontrada");
       return res.status(400).json({ message: "Solicitação de amizade não encontrada" });
     }
 
+    console.log("✅ Solicitação encontrada, atualizando amigos");
+
     // Remove a solicitação e adiciona aos amigos
-    currentUser.friendRequests = currentUser.friendRequests.filter(id => id.toString() !== req.params.id);
+    currentUser.friendRequests = currentUser.friendRequests.filter(
+      id => id.toString() !== req.params.id
+    );
     currentUser.friends.push(req.params.id);
     requestingUser.friends.push(req.user.id);
 
-    await currentUser.save();
-    await requestingUser.save();
+    await Promise.all([currentUser.save(), requestingUser.save()]);
 
     // Criar notificação para o usuário que enviou a solicitação
     const notification = new Notification({
@@ -362,7 +426,8 @@ router.put("/:id/accept-friend", authenticateToken, async (req, res) => {
 
     res.json({ message: "Solicitação de amizade aceita" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("❌ Erro ao aceitar solicitação:", err);
+    res.status(500).json({ message: "Erro ao aceitar solicitação de amizade" });
   }
 });
 
@@ -382,24 +447,6 @@ router.put("/:id/reject-friend", authenticateToken, async (req, res) => {
     res.json({ message: "Solicitação de amizade rejeitada" });
   } catch (err) {
     res.status(500).json({ message: err.message });
-  }
-});
-
-/**
- * @route   GET /api/users/sent-requests
- * @desc    Buscar solicitações de amizade enviadas
- * @access  Privado
- */
-router.get("/sent-requests", authenticateToken, async (req, res) => {
-  try {
-    const users = await User.find({
-      friendRequests: req.user.id
-    }).select("nome username avatar");
-
-    res.status(200).json(users);
-  } catch (err) {
-    console.error("❌ Erro ao buscar solicitações enviadas:", err);
-    res.status(500).json({ message: "Erro ao buscar solicitações enviadas." });
   }
 });
 
