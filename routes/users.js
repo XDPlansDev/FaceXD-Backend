@@ -507,4 +507,66 @@ router.put("/:id/remove-friend", authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @route   PUT /api/users/me
+ * @desc    Atualizar perfil do usuário autenticado
+ * @access  Privado
+ */
+router.put("/me", authenticateToken, async (req, res) => {
+  try {
+    console.log("📝 Atualizando perfil do usuário:", req.user.id);
+    console.log("Dados recebidos:", req.body);
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      console.warn("⚠️ Usuário não encontrado para atualização");
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    // Campos permitidos para atualização
+    const allowedUpdates = ['nome', 'sobrenome', 'bio', 'sexo', 'dataNascimento', 'username'];
+    const updates = Object.keys(req.body)
+      .filter(key => allowedUpdates.includes(key))
+      .reduce((obj, key) => {
+        obj[key] = req.body[key];
+        return obj;
+      }, {});
+
+    // Se tentar atualizar o username, verifica se já passou o tempo mínimo
+    if (updates.username && updates.username !== user.username) {
+      if (user.usernameChangedAt) {
+        const lastChange = new Date(user.usernameChangedAt);
+        const now = new Date();
+        const diffDays = Math.floor((now - lastChange) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 30) {
+          return res.status(400).json({
+            message: "Você só pode alterar seu username a cada 30 dias"
+          });
+        }
+      }
+
+      // Atualiza a data da última mudança de username
+      updates.usernameChangedAt = new Date();
+    }
+
+    // Atualiza os campos
+    Object.keys(updates).forEach(key => {
+      user[key] = updates[key];
+    });
+
+    await user.save();
+    console.log("✅ Perfil atualizado com sucesso");
+
+    // Retorna o usuário atualizado sem a senha
+    const updatedUser = user.toObject();
+    delete updatedUser.password;
+
+    res.json(updatedUser);
+  } catch (err) {
+    console.error("❌ Erro ao atualizar perfil:", err);
+    res.status(500).json({ message: "Erro ao atualizar perfil" });
+  }
+});
+
 module.exports = router;
